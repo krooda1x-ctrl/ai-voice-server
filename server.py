@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import requests
 import os
@@ -9,17 +9,20 @@ app = FastAPI()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "your_openrouter_key")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "your_deepgram_key")
 
-class ConversationPayload(BaseModel):
-    # This matches the schema ElevenLabs uses when initializing agents
-    dynamic_variables: dict = {}
+# Intercept the script's attempt to request an ElevenLabs signed URL/token
+@app.post("/v1/convai/conversations/get_signed_url")
+async def get_signed_url(request: Request):
+    # Tricking the script by giving it a signed URL structure pointing to Deepgram
+    return JSONResponse(status_code=200, content={
+        "signed_url": "wss://://deepgram.com"
+    })
 
-# Intercept conversational agent initialization
+# Backup endpoint in case it checks standard initialization routes
 @app.post("/v1/convai/agents/{agent_id}/initiate-websocket")
 async def mock_agent_websocket(agent_id: str):
-    # This tells the script where to route its voice traffic
     return {"websocket_url": "wss://://deepgram.com"}
 
-# Fallback endpoint if it falls back to standard text-to-speech
+# Text-to-speech fallback
 @app.post("/v1/text-to-speech/{voice_id}")
 async def mock_eleven_labs_tts(voice_id: str, payload: dict):
     try:
@@ -36,7 +39,7 @@ async def mock_eleven_labs_tts(voice_id: str, payload: dict):
 
 @app.get("/")
 async def root():
-    return {"status": "ElevenLabs Agent Proxy Active"}
+    return {"status": "ElevenLabs Advanced Agent Proxy Active"}
 
 if __name__ == "__main__":
     import uvicorn
